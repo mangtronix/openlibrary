@@ -661,7 +661,7 @@ def delete_loan(loan_key, loan = None):
             'type': 'completed-loan',
             'start-date': loan['loaned_at'],
             'end-date': loan['expiry'],
-            'book': loan['book_key'],
+            'book': loan['book'],
             'format': loan['resource_type'],
         }
         # We randomize the key - $$$ table will grow indefinitely
