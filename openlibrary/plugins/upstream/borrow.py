@@ -529,7 +529,7 @@ def _update_loan_status(loan_key, loan, bss_status = None):
         # delete loan record if has expired
         # $$$ consolidate logic for checking expiry.  keep loan record for some time after it expires.
         if loan['expiry'] and loan['expiry'] < datetime.datetime.utcnow().isoformat():
-            web.ctx.site.store.delete(loan_key)
+            delete_loan(loan_key)
         return
         
     # Load status from book status server
@@ -558,7 +558,7 @@ def update_loan_from_bss_status(loan_key, loan, status):
                 return
     
         # Was returned, expired, or timed out
-        web.ctx.site.store.delete(loan_key)
+        delete_loan(loan_key)
         return
 
     # Book has non-returned status
@@ -642,7 +642,35 @@ def return_resource(resource_id):
     loan = web.ctx.site.store.get(loan_key)
     if loan['resource_type'] != 'bookreader':
         raise Exception('Not possible to return loan %s of type %s' % (loan['resource_id'], loan['resource_type']))
-    # $$$ Could add some stats tracking.  For now we just nuke it.
+    delete_loan(loan_key, loan)
+    
+def delete_loan(loan_key, loan = None):
+    """Delete loan from store and record the fact it was returned to circulation"""
+
+    if loan is None:
+        loan = web.site.ctx.store.get(loan_key)
+        
+    if loan is None:
+        # Not found
+        return
+        
+    if loan['expiry']:
+        # Loan was fulfilled
+        # Record book returned to circulation
+        return_info = {
+            'type': 'completed-loan',
+            'start-date': loan['loaned_at'],
+            'end-date': loan['expiry'],
+            'book': loan['book_key'],
+            'format': loan['resource_type'],
+        }
+        # We randomize the key - $$$ table will grow indefinitely
+        web.ctx.site.store['return_%s' % uuid.uuid4().hex] = return_info
+        
+    else:
+        # $$$ log that loan was not fulfilled
+        pass
+        
     web.ctx.site.store.delete(loan_key)
 
 def get_ia_auth_dict(user, item_id, resource_id, user_specified_loan_key, access_token):
@@ -830,7 +858,7 @@ class Loan:
         web.ctx.site.store[self.get_key()] = self.get_dict()
         
     def remove(self):
-        web.ctx.site.delete(self.get_key())
+        delete_loan(self.get_key())
         
     def make_offer(self):
         """Create loan url and record that loan was offered.  Returns the link URL that triggers
