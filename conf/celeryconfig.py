@@ -12,4 +12,16 @@ OL_RESULT_DB_PARAMETERS = { "dbn" : "postgres",
 
 CELERY_IMPORTS = ("openlibrary.tasks", )
 
+# These two files need to be separately mentioned since the tasks will
+# run in the celery workers
 OL_CONFIG = "conf/openlibrary.yml"
+
+# Repeating tasks
+from datetime import timedelta
+
+CELERYBEAT_SCHEDULE = {
+    "runs-every-30-seconds": {
+        "task": "openlibrary.tasks.update_support_from_email",
+        "schedule": timedelta(seconds=30),
+    },
+}
